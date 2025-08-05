@@ -37,6 +37,7 @@ function createWindow () {
   });
 
   win.loadFile('index.html');
+
 }
 
 app.whenReady().then(() => {
@@ -50,11 +51,19 @@ app.whenReady().then(() => {
 });
 
 ipcMain.handle('get-configs', async () => {
-  return readConfigs();
+  const configs = readConfigs();
+  return configs.map(config => ({
+      ...config,
+      icnsName: path.basename(config.icnsPath)
+  }));
 });
 
 ipcMain.handle('save-configs', async (event, configs) => {
-  saveConfigs(configs);
+  const configsWithAppName = configs.map(c => ({
+      ...c,
+      appName: path.basename(c.appPath, '.app')
+  }));
+  saveConfigs(configsWithAppName);
 });
 
 app.on('window-all-closed', () => {
