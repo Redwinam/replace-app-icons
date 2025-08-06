@@ -19,6 +19,17 @@ function initializeApp() {
   const icnsPathDiv = document.getElementById('icns-path');
   const statusDiv = document.getElementById('status');
   const configsListDiv = document.getElementById('configs-list');
+  const hideDockerBtn = document.getElementById('hide-docker-icon-btn');
+
+  hideDockerBtn.addEventListener('click', () => {
+    statusDiv.textContent = '正在执行脚本，请在弹出的窗口中输入密码...';
+    statusDiv.style.color = 'blue';
+    window.api.send('hide-docker-icon');
+  });
+
+  window.api.on('hide-docker-icon-status', (message) => {
+    statusDiv.innerHTML += `<br>${message}`;
+  });
 
   let configs = [];
   let currentConfig = null;
@@ -161,10 +172,13 @@ function initializeApp() {
     if (result.success) {
       statusDiv.textContent = '图标替换成功！可能需要重启Dock才能看到变化。';
       statusDiv.style.color = 'green';
+
+      currentIcnsPath = result.newIcnsPath;
+      icnsPathDiv.textContent = currentIcnsPath;
       
       const newConfig = { 
         appPath: currentAppPath, 
-        icnsPath: currentIcnsPath 
+        icnsPath: currentIcnsPath
       };
 
       const existingIndex = configs.findIndex(c => c.appPath === currentAppPath);
@@ -189,23 +203,30 @@ function initializeApp() {
       return;
     }
 
-    statusDiv.textContent = '开始批量替换...';
+    statusDiv.textContent = '正在批量替换所有配置的图标...';
     statusDiv.style.color = 'black';
-    let successCount = 0;
-    let errorCount = 0;
 
+    let allSucceeded = true;
     for (const config of configs) {
+      statusDiv.innerHTML += `<br>正在替换 ${config.appName}...`;
       const result = await window.api.invoke('replace-icon', config.appPath, config.icnsPath);
       if (result.success) {
-        successCount++;
+        config.icnsPath = result.newIcnsPath; // Update path in the array
+        statusDiv.innerHTML += ` <span style="color: green;">成功</span>`;
       } else {
-        errorCount++;
-        console.error(`Failed to replace icon for ${config.appName}: ${result.error}`);
+        allSucceeded = false;
+        statusDiv.innerHTML += ` <span style="color: red;">失败: ${result.error}</span>`;
       }
     }
 
-    statusDiv.textContent = `批量替换完成！成功 ${successCount} 个, 失败 ${errorCount} 个。`;
-    statusDiv.style.color = errorCount > 0 ? 'orange' : 'green';
+    if (allSucceeded) {
+        statusDiv.innerHTML += '<br>所有图标替换完成。';
+    } else {
+        statusDiv.innerHTML += '<br>部分图标替换失败。';
+    }
+
+    await window.api.invoke('save-configs', configs);
+    loadConfigs();
   });
 
   loadConfigs();
